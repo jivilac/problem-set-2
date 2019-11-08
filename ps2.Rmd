@@ -1,0 +1,64 @@
+---
+title: "hw2"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Part 1
+
+```{r echo=FALSE, warning=FALSE, message = FALSE}
+library(tidyverse)
+library(haven)
+setwd("~/Documents/GitHub/problem-set-2/PSET 2 Files")
+data <- read_dta("conf06.dta")
+conf06 <- subset (data , data $ nominee !=" ALITO ")
+vars <- c("vote", "nominee", "sameprty", "qual", "lackqual","EuclDist2", "strngprs") # vector of vars
+conf <- conf06 [ vars ] # retain only key vars from above object
+conf$numvote <- as.numeric(conf$vote )-1 # from 1/2 to 0/1
+conf$numstrngprs <- as.numeric (conf$strngprs )-1 # same as above
+
+```
+
+
+
+## Question 1
+
+```{r}
+samples <- sample(1:nrow(conf), 
+                  nrow(conf)*0.8, 
+                  replace = FALSE)
+train <- conf[samples, ]
+test <- conf[-samples, ]
+
+```
+
+
+## Question 2
+
+```{r}
+logit <- glm(vote ~ EuclDist2 + qual + lackqual + strngprs + sameprty,
+               data = train,
+               family = binomial); summary(logit)
+
+vote <- test$vote
+
+logit.probs1 <- predict(logit, newdata=test, type="response") 
+
+logit.pred1 <- ifelse(logit.probs1 > 0.5, 1, 0)
+
+table(logit.pred1, vote)
+
+mean(logit.pred1 == vote)
+```
+
+
+## Question 3
+
+```{r}
+
+
+```
+
