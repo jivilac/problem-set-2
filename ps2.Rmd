@@ -12,6 +12,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r echo=FALSE, warning=FALSE, message = FALSE}
 library(tidyverse)
 library(haven)
+library(pROC)
 setwd("~/Documents/GitHub/problem-set-2/PSET 2 Files")
 data <- read_dta("conf06.dta")
 conf06 <- subset (data , data $ nominee !=" ALITO ")
@@ -39,7 +40,7 @@ test <- conf[-samples, ]
 ## Question 2
 
 ```{r}
-logit <- glm(vote ~ EuclDist2 + qual + lackqual + strngprs + sameprty,
+logit <- glm(vote ~ EuclDist2 + qual + strngprs + sameprty,
                data = train,
                family = binomial); summary(logit)
 
@@ -52,13 +53,128 @@ logit.pred1 <- ifelse(logit.probs1 > 0.5, 1, 0)
 table(logit.pred1, vote)
 
 mean(logit.pred1 == vote)
+
+
+y_logit_roc <- test$vote
+pred_logit_roc <- predict(logit, 
+                 newdata = test, 
+                 type="response")
+
+plot.roc(y_logit_roc, pred_logit_roc, col = "red") 
 ```
 
 
 ## Question 3
 
 ```{r}
+## Linear Discriminant Analysis
+library(MASS) # for LDA
+lda <- lda(vote ~ EuclDist2 + qual + strngprs + sameprty,
+               data=train)
+
+# inspect the model (don't use summary here)
+lda
+
+plot(lda)
+
+
+lda.pred <- predict(lda, newdata=test) 
+
+data.frame(lda.pred)[1:5,]
+# predicting are different than posterior becaus we have the distribution for every point of the original data.
+# confusion matrix
+table_lda <- table(lda.pred$class, vote)
+table_lda
+# check the classification rate
+mean(lda.pred$class ==vote)
+
+y_lda_roc <- test$vote
+pred_lda_roc <- predict(lda, 
+                 newdata = test, 
+                 type="response")
+
+plot.roc(y_lda_roc ,pred_lda_roc$posterior[,2], col = "red") 
 
 
 ```
 
+## Question 4
+
+```{r}
+# CIs for predicted probabilities
+
+#propetit ~ ineffcou + multpet + usparty + liberal2
+#vote ~ EuclDist2 + qual + lackqual + strngprs + sameprty
+
+logit2 <- glm(vote ~ EuclDist2 + qual  + strngprs + sameprty,
+               data = conf,
+               family = binomial(link=logit))
+
+
+newdata2 <- with(conf, data.frame(qual = rep(seq(from = min(conf$qual) , to = max(conf$qual), length.out = 100),
+                                                   2), 
+                                  EuclDist2 = mean(EuclDist2),
+                                  strngprs = mean(strngprs),
+                                  sameprty = mean(sameprty))) 
+
+newdata3 <- cbind( newdata2,predict(logit2, newdata = newdata2, type = "link",se = TRUE))
+
+# Add CIs
+newdata3 <- within(newdata3, {
+  PredictedProb <- plogis(fit)
+  LL <- plogis(fit - (1.96 * se.fit))
+  UL <- plogis(fit + (1.96 * se.fit))
+})
+
+# Recode usparty as a factor
+#newdata3$usparty <- factor(newdata3$usparty, labels=c("No", "Yes"))
+
+# Plot predictions with CIs
+ggplot(newdata3, aes(x = qual, y = PredictedProb)) +
+  geom_line() +
+  geom_errorbar(aes(ymin = LL, ymax = UL),
+                color="gray",
+                size=.3,
+                width=.2,
+                position = position_dodge(.9)) +
+  labs(x = "Qualification of Candidate",
+       y = "Probability of voting for him"
+       )  +
+  ggtitle("The Conditional Effect of Liberalism on Granting Relief") +
+  theme_bw() +
+  theme(legend.justification = c(.7,1),
+        legend.position = c(.9,.3))
+
+
+ggplot(newdata3, aes(x = qual, y = PredictedProb, color='red')) + geom_ribbon(aes(ymin = LL,
+    ymax = UL), alpha = 0.2) +
+  labs(x = "Qualification of Candidate",
+       y = "Probability of voting for him"
+       )  +
+  ggtitle("The Conditional Effect of Qualification of candidate in the probability of vote for him") +
+  theme_bw() +
+  theme(legend.justification = c(.7,1),
+        legend.position = c(.9,.3))
+
+
+
+```
+
+## Question 5
+
+## Question 6
+
+
+
+# Part 2
+
+## Question 1
+```{r}
+
+
+```
+
+
+## Question 2
+
+## Question 3
