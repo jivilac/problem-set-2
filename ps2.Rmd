@@ -1,6 +1,9 @@
 ---
 title: "hw2"
-output: pdf_document
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
@@ -39,22 +42,28 @@ test <- conf[-samples, ]
 
 ## Question 2
 
-```{r}
+```{r echo=FALSE}
 logit <- glm(vote ~ EuclDist2 + qual + strngprs + sameprty,
                data = train,
-               family = binomial); summary(logit)
+               family = binomial)
 
 vote <- test$vote
 
 logit.probs1 <- predict(logit, newdata=test, type="response") 
 
 logit.pred1 <- ifelse(logit.probs1 > 0.5, 1, 0)
+```
 
-table(logit.pred1, vote)
+```{r echo=FALSE}
+summary(logit)
+```
 
+```{r echo=FALSE}
 mean(logit.pred1 == vote)
+table(logit.pred1, vote)
+```
 
-
+```{r echo=FALSE}
 y_logit_roc <- test$vote
 pred_logit_roc <- predict(logit, 
                  newdata = test, 
@@ -66,7 +75,7 @@ plot.roc(y_logit_roc, pred_logit_roc, col = "red")
 
 ## Question 3
 
-```{r}
+```{r echo=FALSE}
 ## Linear Discriminant Analysis
 library(MASS) # for LDA
 lda <- lda(vote ~ EuclDist2 + qual + strngprs + sameprty,
@@ -74,10 +83,14 @@ lda <- lda(vote ~ EuclDist2 + qual + strngprs + sameprty,
 
 # inspect the model (don't use summary here)
 lda
-
+```
+*** Graph XXX ***
+```{r echo=FALSE}
 plot(lda)
 
-
+```
+*** Confusion Matrix LDA *** 
+```{r echo=FALSE}
 lda.pred <- predict(lda, newdata=test) 
 
 data.frame(lda.pred)[1:5,]
@@ -85,9 +98,14 @@ data.frame(lda.pred)[1:5,]
 # confusion matrix
 table_lda <- table(lda.pred$class, vote)
 table_lda
-# check the classification rate
+```
+*** Average good clasification of LDA ***
+```{r echo=FALSE}
 mean(lda.pred$class ==vote)
+```
 
+
+```{r echo=FALSE}
 y_lda_roc <- test$vote
 pred_lda_roc <- predict(lda, 
                  newdata = test, 
@@ -95,12 +113,11 @@ pred_lda_roc <- predict(lda,
 
 plot.roc(y_lda_roc ,pred_lda_roc$posterior[,2], col = "red") 
 
-
 ```
 
 ## Question 4
 
-```{r}
+```{r echo = FALSE}
 # CIs for predicted probabilities
 
 #propetit ~ ineffcou + multpet + usparty + liberal2
@@ -126,26 +143,6 @@ newdata3 <- within(newdata3, {
   UL <- plogis(fit + (1.96 * se.fit))
 })
 
-# Recode usparty as a factor
-#newdata3$usparty <- factor(newdata3$usparty, labels=c("No", "Yes"))
-
-# Plot predictions with CIs
-ggplot(newdata3, aes(x = qual, y = PredictedProb)) +
-  geom_line() +
-  geom_errorbar(aes(ymin = LL, ymax = UL),
-                color="gray",
-                size=.3,
-                width=.2,
-                position = position_dodge(.9)) +
-  labs(x = "Qualification of Candidate",
-       y = "Probability of voting for him"
-       )  +
-  ggtitle("The Conditional Effect of Liberalism on Granting Relief") +
-  theme_bw() +
-  theme(legend.justification = c(.7,1),
-        legend.position = c(.9,.3))
-
-
 ggplot(newdata3, aes(x = qual, y = PredictedProb, color='red')) + geom_ribbon(aes(ymin = LL,
     ymax = UL), alpha = 0.2) +
   labs(x = "Qualification of Candidate",
@@ -157,9 +154,8 @@ ggplot(newdata3, aes(x = qual, y = PredictedProb, color='red')) + geom_ribbon(ae
         legend.position = c(.9,.3))
 
 
-
 ```
-
+We can see as the qualification of the 
 ## Question 5
 
 ## Question 6
@@ -169,12 +165,93 @@ ggplot(newdata3, aes(x = qual, y = PredictedProb, color='red')) + geom_ribbon(ae
 # Part 2
 
 ## Question 1
-```{r}
+```{r echo=FALSE}
+library(wnominate) # for algorithm
+library(pscl) # for "readKH()" function
+setwd("~/Documents/GitHub/problem-set-2/PSET 2 Files")
+house113 <- readKH (
+("hou113kh.ord"), # locate the .ord file saved locally
+dtl=NULL ,
+yea=c(1 ,2 ,3) ,
+nay=c(4 ,5 ,6) ,
+missing =c(7 ,8 ,9) ,
+notInLegis =0,
+desc ="113 th_ House _ Roll _ Call _ Data ",
+debug = FALSE
+)
 
+wnom_result <- wnominate(house113, 
+                         dims = 2,
+                         minvotes = 20,
+                         lop = 0.025,
+                         polarity = c(2,2))
 
+wnom_result_5d <- wnominate(house113, 
+                         dims = 5,
+                         minvotes = 20,
+                         lop = 0.025,
+                         polarity = c(2,2,2,2,2))
+```
+
+```{r echo=FALSE}
+# canned plot(s)
+plot(wnom_result)
+par(mfrow = c(1,1)) # reset plot pane space
+```
+
+```{r echo=FALSE}
+# store a few things for plotting
+wnom1 <- wnom_result$legislators$coord1D 
+wnom2 <- wnom_result$legislators$coord2D 
+party <- house113$legis.data$party 
+```
+
+```{r echo=FALSE}
+# custom plot
+plot(wnom1, wnom2,
+     main="113th United States House\n(W-NOMINATE)",
+     xlab="First Dimension (Ideology) \nD = Democrat, R = Republican, I = Independent",
+     ylab="Second Dimension (Race / Civil Rights)",
+     xlim=c(-1,1), ylim=c(-1,1), type="n")
+points(wnom1[party=="D"], wnom2[party=="D"], pch="D", col="gray15")
+points(wnom1[party=="R"], wnom2[party=="R"], pch="R", col="gray30")
+points(wnom1[party=="Indep"], wnom2[party=="Indep"], pch="I", col="red")
 ```
 
 
+
 ## Question 2
+***Discuss the dimensionality of the space. You can present and inspect fit via the aggregate
+proportion reduction in errors (APRE), the geometric mean prediction (GMP) rate, scree
+plots, or any other diagnostic tool (visual or numeric) to inspect the overall fit of the
+algorithm.***
+
+For viewing the dimmensionality of the space to fit the data, we can see the eigen values of the fitting of the data.Examining the eigen values we see that the first four are over one. Meaning that maybe we can see that we can explain this data with four dimmension. Nervertheless, we can see that the first value is 69, meaning that most of the variance is explianed by the first dimension, then the second value is 1.97, the third is 1.73 and fourth one is 1.16. Impliying that it's not obvious that the other three dimensions have some explinatory power that is relevant even if the eiganvalue is over one.
+
+***Eigenvalues***
+
+```{r echo=FALSE}
+head(wnom_result$eigenvalues)
+```
+
+For countinuing the analysis we are going to analyze the APRE and GMP rates, particullarilly we are going to analyze the difference between the difference dimentions that are calculated for doing this we are going to fit the algorithm for 2 and 5 dimensions.
+
+### Results 2-Dims
+```{r echo=FALSE}
+summary(wnom_result)
+```
+### Results 5-Dims
+```{r echo=FALSE}
+summary(wnom_result_5d)
+```
+***Plots 5-D***
+```{r echo=FALSE}
+plot(wnom_result)
+```
+
 
 ## Question 3
+
+The major problem of this methodology if we compare to a classification technique is that in the W-Nominate techniques we assume an specific utility function, instead in a clasification technique we assume normally a linear form that can be flexible enough to incorporate another non-lineariality. This have especific consequences in how we treat extreme values, meaning that as one of the assumptions of W-N models is how we construct distances relative to a pivot point that create the extreme value that we choose.
+
+Another issue, is that this technique have is that we don't know which dimensions explain the result what we are seeing in the different plots where we can build. Instead in clasification thecniques we already know which dimensions are, but at the same time we don't know if we are missing dimensions.
