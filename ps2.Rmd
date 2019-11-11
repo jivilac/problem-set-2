@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(haven)
 library(pROC)
+set.seed(12345)
 setwd("~/Documents/GitHub/problem-set-2/PSET 2 Files")
 data <- read_dta("conf06.dta")
 conf06 <- subset (data , data $ nominee !=" ALITO ")
@@ -53,15 +54,30 @@ logit.probs1 <- predict(logit, newdata=test, type="response")
 
 logit.pred1 <- ifelse(logit.probs1 > 0.5, 1, 0)
 ```
+We can see that the bigger estimator is the Ecludian distance of the inferred ideal point, following by the qualification. The first one is negative meaning that dimminish the probability of voting for that particular candidate. In the case of the qualification is in the other way around. Finally the varuables if the president is string at the moment of voting and the if the share the party afiliation with the president we see that both increase the probability of the senator voting for that particular candidate.
+
+*** Summary of Logit Results ***
 
 ```{r echo=FALSE}
 summary(logit)
 ```
+If we estimate the confusion matrix we get that the accuracy in the test sample 91.4% (44+643/(44+12+63+643)) of the case correctly. In other hand, we can see that the precision is 97.33%, impliying that the model correctly assign the labels.
+
+***Confusion Matrix***
 
 ```{r echo=FALSE}
 mean(logit.pred1 == vote)
+
+```
+
+***Accuracy in clasification of Logit***
+
+```{r echo=FALSE}
 table(logit.pred1, vote)
 ```
+Finally, in the case of the ROC graph we see that the model assign the labels correctly because the curve moves to the upper right corner of the graph.
+
+*** ROC Plot***
 
 ```{r echo=FALSE}
 y_logit_roc <- test$vote
@@ -74,7 +90,7 @@ plot.roc(y_logit_roc, pred_logit_roc, col = "red")
 
 
 ## Question 3
-
+When we fit the LDA model into the data, we find that the results are not different to the parameters estimated to the logit in sign, but the relative intensity between them is different. For example, the qualifications and the euclidian distance to the ideal point in relative terms in the logit are quite similar, instead in the LDA the ecuaclidian distance is much bigger. Nevertheless, the rank as absolute value of the estimator is the same as in the Logit estimation.
 ```{r echo=FALSE}
 ## Linear Discriminant Analysis
 library(MASS) # for LDA
@@ -84,12 +100,20 @@ lda <- lda(vote ~ EuclDist2 + qual + strngprs + sameprty,
 # inspect the model (don't use summary here)
 lda
 ```
-*** Graph XXX ***
+
+*** Graph group distribution ***
+
+We can see the distribution of the groups and there is some difference between the both groups meaning that the estimator manege to differenciate both groups. The distribution are centered in different values and we observe the over the value of zero there is sustantial change in the histograms.
+
 ```{r echo=FALSE}
 plot(lda)
 
 ```
-*** Confusion Matrix LDA *** 
+
+When we construct the confusion matrix we can see that overall precision and accuracy are 95.07% and 90.68% respectivly. Meaning that the overall assignation of the labels is fairly correct.
+
+
+***Confusion Matrix LDA*** 
 ```{r echo=FALSE}
 lda.pred <- predict(lda, newdata=test) 
 
@@ -99,11 +123,13 @@ data.frame(lda.pred)[1:5,]
 table_lda <- table(lda.pred$class, vote)
 table_lda
 ```
-*** Average good clasification of LDA ***
+
+***Accuracy in clasification of LDA***
+
 ```{r echo=FALSE}
 mean(lda.pred$class ==vote)
 ```
-
+Finally, if we plot the ROC curve for the LDA and we can see that prediction is fearly good, because is in the upper left corner of the graph.
 
 ```{r echo=FALSE}
 y_lda_roc <- test$vote
@@ -155,17 +181,68 @@ ggplot(newdata3, aes(x = qual, y = PredictedProb, color='red')) + geom_ribbon(ae
 
 
 ```
-We can see as the qualification of the 
+We can see as the qualification increase the probability of vote also increase. Nevertheless, is important to see that even for low levels of qualification the base probability is also high (60%). This implies that probably other factore are relevant to the analysis but a highly qualified judge will be always be voted in favor.
+
 ## Question 5
 
+We can see that both models predict fairly the same results, actually we can show that in test sample, both models predict 97.37% of cases with the same label. Also we can see that both roc curves are quite similar in shape and the confusion matrix are behahve quiate similar in accuracy and precision. This imply that both models predict very well in the test set. 
+In terms of which model predicts better depends which indicator we take into consideration to make the decision, if we are interested in an overall prediction is better to think in accuracy(i.e we are interested in the negative and positive cases) in the other hand if we are interesting only in the postive cases we may prefer to use precision. In this case the logit model have a better fit in any metrics that the LDA, have better precision(95% vs 97%) and better accuracy(90% vs 91%).  
+
+***Average prediction of both model predicting the same for the same observation in the test set ***
+
+```{r echo=FALSE}
+mean(lda.pred$class ==logit.pred1)
+```
+
+In conclusion, the main difference as we said before is the relative intensitivity between the variables more than the overall sign of the effect of them.
+
 ## Question 6
+```{r echo=FALSE}
+newdata2_1 <- with(conf, data.frame(qual = rep(seq(from = min(conf$qual) , to = max(conf$qual), length.out = 100),
+                                                   2), 
+                                  EuclDist2 = mean(EuclDist2),
+                                  strngprs = mean(strngprs),
+                                  sameprty = rep(0:1, each = 100))) 
+
+newdata4 <- cbind( newdata2_1,predict(logit2, newdata = newdata2_1, type = "link",se = TRUE))
 
 
+# Recode usparty as a factor
+newdata4$sameprty <- factor(newdata4$sameprty, labels=c("No", "Yes"))
+
+
+
+# Add CIs
+newdata4 <- within(newdata4, {
+  PredictedProb <- plogis(fit)
+  LL <- plogis(fit - (1.96 * se.fit))
+  UL <- plogis(fit + (1.96 * se.fit))
+})
+
+
+
+# Plot predictions with CIs
+
+ggplot(newdata4, aes(x = qual, y = PredictedProb)) + geom_ribbon(aes(ymin = LL,
+    ymax = UL, fill = sameprty), alpha = 0.2) + geom_line(aes(colour = sameprty),
+    size = 1) +
+  labs(x = "Qualification of the candidates",
+       y = "Probability of voting on favor of the candidate",
+       color = "Senator have the same party as the president") +
+  scale_fill_hue(breaks = c("No", "Yes"),
+                 labels = c("No",  "Yes")) +
+  ggtitle("The Conditional Effect of Qualifications of the candidate and \n
+          if party of the senator the same as the president") 
+
+
+
+
+```
 
 # Part 2
 
 ## Question 1
-```{r echo=FALSE}
+```{r W-Nomite Fit, echo=FALSE, message=FALSE, warning=FALSE}
 library(wnominate) # for algorithm
 library(pscl) # for "readKH()" function
 setwd("~/Documents/GitHub/problem-set-2/PSET 2 Files")
@@ -199,24 +276,7 @@ plot(wnom_result)
 par(mfrow = c(1,1)) # reset plot pane space
 ```
 
-```{r echo=FALSE}
-# store a few things for plotting
-wnom1 <- wnom_result$legislators$coord1D 
-wnom2 <- wnom_result$legislators$coord2D 
-party <- house113$legis.data$party 
-```
 
-```{r echo=FALSE}
-# custom plot
-plot(wnom1, wnom2,
-     main="113th United States House\n(W-NOMINATE)",
-     xlab="First Dimension (Ideology) \nD = Democrat, R = Republican, I = Independent",
-     ylab="Second Dimension (Race / Civil Rights)",
-     xlim=c(-1,1), ylim=c(-1,1), type="n")
-points(wnom1[party=="D"], wnom2[party=="D"], pch="D", col="gray15")
-points(wnom1[party=="R"], wnom2[party=="R"], pch="R", col="gray30")
-points(wnom1[party=="Indep"], wnom2[party=="Indep"], pch="I", col="red")
-```
 
 
 
@@ -236,16 +296,62 @@ head(wnom_result$eigenvalues)
 
 For countinuing the analysis we are going to analyze the APRE and GMP rates, particullarilly we are going to analyze the difference between the difference dimentions that are calculated for doing this we are going to fit the algorithm for 2 and 5 dimensions.
 
+The results show us that as we incorporate new dimmensions the delta in improvement in the APRE and GMP decrease showing that as new dimension is incoported less variance is explained. This correlate with what we see in the eigenvalues where the first one is very big and the following three are very close to one. Impliying that the improvement in the overall prediction for incorporating additional dimensions are not big enough to maybe incorporate them. 
+
+Also if we plot the results in the first two dimension for both fitted W-Nominate estimator. We see that five dimension plot is more compress in the one of five dimension. 
+
+*Graph Five dimension vs two dimension*
+
+```{r echo=FALSE}
+# store a few things for plotting
+wnom1 <- wnom_result$legislators$coord1D 
+wnom2 <- wnom_result$legislators$coord2D 
+party <- house113$legis.data$party 
+
+wnom1_5d <- wnom_result_5d$legislators$coord1D 
+wnom2_5d <- wnom_result_5d$legislators$coord2D 
+party_5d <- house113$legis.data$party 
+par(mfrow = c(1,2))
+# custom plot
+plot(wnom1, wnom2,
+     main="113th United States House - 2Dims\n(W-NOMINATE)",
+     xlab="First Dimension (Ideology) \nD = Democrat, R = Republican, I = Independent",
+     ylab="Second Dimension (Race / Civil Rights)",
+     xlim=c(-1,1), ylim=c(-1,1), type="n")
+points(wnom1[party=="D"], wnom2[party=="D"], pch="D", col="gray15")
+points(wnom1[party=="R"], wnom2[party=="R"], pch="R", col="gray30")
+points(wnom1[party=="Indep"], wnom2[party=="Indep"], pch="I", col="red")
+
+plot(wnom1_5d, wnom2_5d,
+     main="113th United States House- 5Dims.\n(W-NOMINATE)",
+     xlab="First Dimension (Ideology) \nD = Democrat, R = Republican, I = Independent",
+     ylab="Second Dimension (Race / Civil Rights)",
+     xlim=c(-1,1), ylim=c(-1,1), type="n")
+points(wnom1_5d[party=="D"], wnom2_5d[party=="D"], pch="D", col="gray15")
+points(wnom1_5d[party=="R"], wnom2_5d[party=="R"], pch="R", col="gray30")
+points(wnom1_5d[party=="Indep"], wnom2_5d[party=="Indep"], pch="I", col="red")
+
+
+```
+
+
 ### Results 2-Dims
+
 ```{r echo=FALSE}
 summary(wnom_result)
 ```
+
 ### Results 5-Dims
+
 ```{r echo=FALSE}
+
 summary(wnom_result_5d)
 ```
-***Plots 5-D***
+
+*Plots 5-D*
+
 ```{r echo=FALSE}
+par(mfrow = c(1,1))
 plot(wnom_result)
 ```
 
